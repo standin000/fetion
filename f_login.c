@@ -296,7 +296,15 @@ gint ParseCfg(struct fetion_account_data *sip)
 	sip->ServerVersion = g_strdup(server_ver);
 	purple_debug_info("fetion", "systemconfig:cfg_ver[%s]\n",
 			  sip->ServerVersion);
-	item = xmlnode_get_child(son_node, "sipc-proxy");
+        /* Plato Wu,2010/08/05: use sipc-ssl-proxy for passing firewall*/
+        if(purple_account_get_bool(sip->account, "usessl", FALSE) == TRUE)
+            //    purple_debug_info("fetion","port is 433");
+            item = xmlnode_get_child(son_node, "sipc-ssl-proxy");
+        else
+            item = xmlnode_get_child(son_node, "sipc-proxy");
+//            purple_debug_info("fetion","port is 8080");
+
+	
 	g_return_val_if_fail(item != NULL, -2);
 	msg_server = g_strdup(xmlnode_get_data(item));
 	item = xmlnode_get_child(son_node, "ssi-app-sign-in");
@@ -428,7 +436,11 @@ void RetriveSysCfg_cb(gpointer sodata, gint source, const gchar * error_message)
 		}
 		purple_debug_info("fetion", "systemconfig:after servers[%s]",
 				  sip->SysCfg.buf);
-		item = xmlnode_get_child(son_node, "sipc-proxy");
+        /* Plato Wu,2010/08/05: use sipc-ssl-proxy for passing firewall*/
+                if(purple_account_get_bool(sip->account, "usessl", FALSE) == TRUE)
+                    item = xmlnode_get_child(son_node, "sipc-ssl-proxy");
+                else
+                    item = xmlnode_get_child(son_node, "sipc-proxy");
 		g_return_if_fail(item != NULL);
 		msg_server = g_strdup(xmlnode_get_data(item));
 		item = xmlnode_get_child(son_node, "ssi-app-sign-in");

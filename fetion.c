@@ -1703,9 +1703,10 @@ static void _init_plugin(PurplePlugin * plugin)
 	PurpleAccountOption *option;
 	split = purple_account_user_split_new(_("Server"), "", '@');
 	prpl_info.user_splits = g_list_append(prpl_info.user_splits, split);
-
+        /* Plato Wu,2010/08/05: remove  realname option and add use ssl option*/
 	option =
-	    purple_account_option_string_new(_("Real Name"), "realname", "");
+	    purple_account_option_bool_new(_("Use SSL"), "usessl", FALSE);
+
 	prpl_info.protocol_options =
 	    g_list_append(prpl_info.protocol_options, option);
 
