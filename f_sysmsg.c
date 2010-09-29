@@ -131,6 +131,132 @@ void process_incoming_BN(struct fetion_account_data *sip, struct sipmsg *msg)
 			g_free(alias);
 
 		}
+                /* Plato Wu,2010/09/25: SIP-C/4.0 use PresenceChanged command to tell client contacts
+                 * information. */
+                event_node = xmlnode_get_child(event_node, "contacts");
+                for (item = xmlnode_get_child(event_node, "c"); item; item = xmlnode_get_next_twin(item)) {
+                        const gchar *uri = NULL, *name, *uid;
+			char *buddy_name;
+			const gchar *g_id;
+                        const gchar *relation_status;
+                        PurpleBuddy *b;
+                        PurpleGroup *g = NULL;
+                        struct fetion_buddy *bs;
+                        struct group_attr *g_attr;
+                        if(sip->GetContactFlag == 0)
+                        {
+                                buddy_name = g_strdup_printf("%s", sip->uri);
+                                
+                                b = purple_find_buddy(sip->account, buddy_name);
+                                if (!b) {
+                                        b = purple_buddy_new(sip->account, buddy_name, NULL);
+                                }
+                        
+                                g_free(buddy_name);
+                                purple_blist_add_buddy(b, NULL, g, NULL);
+                                purple_blist_alias_buddy(b, "轰炸自己");
+                                bs = g_new0(struct fetion_buddy, 1);
+                                bs->name = g_strdup(b->name);
+                                g_hash_table_insert(sip->buddies, bs->name, bs);
+                                purple_debug_info("fetion:", "AddMyself %s",sip->uri);
+                                purple_prpl_got_user_status(sip->account, sip->uri, "available", NULL);
+                                sip->GetContactFlag = 1;
+                        }
+
+			personal = xmlnode_get_child(item, "p");
+                        
+			if(personal)
+                        {
+                                uri = xmlnode_get_attrib(personal, "su");
+                                name = xmlnode_get_attrib(personal, "n");
+                                uid = xmlnode_get_attrib(item, "id");
+                                buddy_name = g_strdup_printf("%s", uri);
+
+                                g = purple_find_group("未分组");
+                                if (!g){
+                                        g = purple_group_new("未分组");
+                                        g_attr = g_new0(struct group_attr, 1);
+                                        g_attr->name = g_strdup("未分组");
+                                        g_attr->id = g_strdup("1");
+                                        g_hash_table_insert(sip->group, g_attr->id, g_attr);
+                                        g_hash_table_insert(sip->group2id, g_attr->name,
+                                                            g_attr);
+                                }
+                                
+                                /* Plato Wu,2010/09/28: sip->buddies will be filled with blist.xml,
+                                   so it is not empty before getting presence information from server. */
+                                b = purple_find_buddy(sip->account, buddy_name);
+                                
+                                if (!b) {
+                                        b = purple_buddy_new(sip->account, buddy_name,
+                                                             NULL);
+                                        purple_blist_add_buddy(b, NULL, g, NULL);
+                                        bs = g_new0(struct fetion_buddy, 1);
+                                        bs->name = g_strdup(b->name);
+                                        g_hash_table_insert(sip->buddies, bs->name, bs);
+                                }
+                                if(g_hash_table_lookup(sip->uri2uid, uid) == NULL){
+                                        g_attr = g_new0(struct group_attr, 1);
+                                        g_attr->name = g_strdup(buddy_name);
+                                        g_attr->id = g_strdup(uid);
+                                        g_hash_table_insert(sip->uri2uid, g_attr->id,
+                                                            g_attr);
+                                }
+                                g_free(buddy_name);
+
+                                if (name != NULL && *name != '\0')
+                                        purple_blist_alias_buddy(b, name);
+                        }
+                        
+                        basic = xmlnode_get_child(item, "pr");
+
+                        if(basic){
+                                if(uri == NULL)
+                                {
+                                        uid = xmlnode_get_attrib(item, "id");
+                                        g_attr = g_hash_table_lookup(sip->uri2uid, uid);
+                                        if(g_attr)
+                                                uri = g_attr->name;
+                                }
+                                
+                                if(uri){
+                                        basicstatus = xmlnode_get_attrib(basic, "b");
+                                        switch(atoi(basicstatus)){
+                                        case 400:
+                                                purple_prpl_got_user_status(sip->account, uri, "available", NULL);
+                                                break;
+                                        case 300:
+                                                purple_prpl_got_user_status(sip->account, uri, "brb", NULL);
+                                                break;
+                                        case 100:	//away
+                                                purple_prpl_got_user_status
+                                                        (sip->account, uri, "away",
+                                                         NULL);
+                                                break;
+                                        case 600:	//busy
+                                        case 800:
+                                        case 850:
+                                                purple_prpl_got_user_status
+                                                        (sip->account, uri, "busy",
+                                                         NULL);
+                                                break;
+                                        case 150:
+                                                purple_prpl_got_user_status
+                                                        (sip->account, uri, "lunch",
+                                                         NULL);
+                                                break;
+                                        case 0:
+                                                purple_prpl_got_user_status
+                                                        (sip->account, uri, "offline",
+                                                         NULL);
+                                                break;
+                                        }
+                                }
+                                
+                        }
+
+                        
+		}
 
 	} else if (strncmp(event_type, "UserEntered", 11) == 0) {
 		from = sipmsg_find_header(msg, "F");
@@ -220,7 +346,9 @@ void process_incoming_BN(struct fetion_account_data *sip, struct sipmsg *msg)
 			g_free(alias);
 
 		}
-	}
+	} else if (strncmp(event_type, "SyncUserInfoV4", 14) == 0) {
+                /* Plato Wu,2010/09/29: TODO, how to handle this command in SIP-C/4.0 */
+        }
 
 	xmlnode_free(root);
 

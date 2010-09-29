@@ -84,9 +84,11 @@ void do_register_exp(struct fetion_account_data *sip, gint expire)
 	gchar *hdr = NULL;
 
 	sip->reregister = time(NULL) + expire - 100;
-	body =
-	    g_strdup_printf
-	    (" <args><device type=\"PC\" version=\"0\" client-version=\"4.0.3340\" /><caps value=\"fetion-im;im-session;temp-group\" /><events value=\"contact;permission;system-message\" /><user-info attributes=\"all\" /><presence><basic value=\"400\" desc=\"\" /></presence></args>");
+
+        /* Plato Wu,2010/09/24: FETION_REGISTER_SENT in SIP-C/4.0'S  don't need this body */
+            /*     	body = */
+	    /* g_strdup_printf */
+	    /* (" <args><device type=\"PC\" version=\"0\" client-version=\"4.0.3340\" /><caps value=\"fetion-im;im-session;temp-group\" /><events value=\"contact;permission;system-message\" /><user-info attributes=\"all\" /><presence><basic value=\"400\" desc=\"\" /></presence></args>"); */
 
 	if (sip->registerstatus == FETION_REGISTER_COMPLETE) {
 		if (expire == 0)
@@ -95,13 +97,26 @@ void do_register_exp(struct fetion_account_data *sip, gint expire)
 		body = NULL;
 	} else if (sip->registerstatus == FETION_REGISTER_RETRY
 		   && (sip->registrar.digest_session_key)) {
-		hdr =
-		    g_strdup_printf
-		    ("A: Digest response=\"%s\",cnonce=\"%s\"\r\n",
-		     sip->registrar.digest_session_key, sip->registrar.cnonce);
+                /* Plato Wu,2010/09/24: SIP/C-4.0 require this body and response value */
+	body =
+	    g_strdup_printf
+                ("<args><device machine-code=\"001676C0E351\"/><caps value=\"1ff\"/><events value=\"7f\"/><user-info user-id=\"%s\"><personal version=\"0\" attributes=\"v4default\"/><custom-config version=\"0\"/><contact-list version=\"0\" buddy-attributes=\"v4default\"/></user-info><credentials domains=\"fetion.com.cn\"/><presence><basic value=\"400\" desc=\"\"/></presence></args>", sip->uid);
+        hdr =
+                g_strdup_printf
+                ("A: Digest response=\"%s\",algorithm=\"SHA1-sess-v4\"\r\nAK: ak-value\r\n", sip->registrar.digest_session_key);
+
+		/* hdr = */
+		/*     g_strdup_printf */
+		/*     ("A: Digest response=\"%s\",cnonce=\"%s\"\r\n", */
+		/*      sip->registrar.digest_session_key, sip->registrar.cnonce); */
+
 	} else {
 		sip->registerstatus = FETION_REGISTER_SENT;
-		hdr = NULL;
+                /* Plato Wu,2010/09/24: Add it for new login algorithm in SIP-C/4.0*/
+                hdr =
+		    g_strdup_printf
+                        ("CN: %s \r\nCL: type=\"pc\" ,version=\"4.0.3340\"", gencnonce());
+//		hdr = NULL;
 	}
 
 	send_sip_request(sip->gc, "R", "", "", hdr, body, NULL,
@@ -122,7 +137,8 @@ gboolean read_cookie(gpointer sodata, PurpleSslConnection * source, gint con)
 	gchar buf[10240];
 	gchar *cur = NULL;
 	gchar *end = NULL;
-	const gchar *uri = NULL;
+        /* Plato Wu,2010/09/29: SIP-C/4.0 will use uid. */
+	const gchar *uri = NULL, *uid = NULL;
 	xmlnode *isc, *item;
 	gint len, rcv_len;
 	PurpleSslConnection *gsc;
@@ -163,6 +179,9 @@ gboolean read_cookie(gpointer sodata, PurpleSslConnection * source, gint con)
 			g_return_val_if_fail(isc != NULL, FALSE);
 			item = xmlnode_get_child(isc, "user");
 			g_return_val_if_fail(item != NULL, FALSE);
+			uid = xmlnode_get_attrib(item, "user-id");
+                        g_return_val_if_fail(uid != NULL, FALSE);
+                        sip->uid = g_strdup(uid);
 			uri = xmlnode_get_attrib(item, "uri");
 			g_return_val_if_fail(uri != NULL, FALSE);
 			sip->uri = g_strdup(uri);
@@ -608,6 +627,10 @@ void fetion_login(PurpleAccount * account)
 	sip->group2id =
 	    g_hash_table_new((GHashFunc) fetion_ht_hash_nick,
 			     (GEqualFunc) fetion_ht_equals_nick);
+        /* Plato Wu,2010/09/29: It is used for lookup uri by uid */
+        sip->uri2uid =
+                g_hash_table_new((GHashFunc) fetion_ht_hash_nick,
+			     (GEqualFunc) fetion_ht_equals_nick);
 
 	purple_connection_update_progress(gc, _("Connecting"), 1, 2);
 
@@ -663,25 +686,27 @@ char* hash_password_v1(const unsigned char* b0 , int b0len , const unsigned char
 	purple_cipher_context_destroy(context);
 
 	free(dst);
-	return g_strdup(digest);
+        return g_ascii_strup(digest, -1);
 }
-/*char* hash_password_v2(const char* userid , const char* passwordhex) */
-/*{*/
-	/*int id = atoi(userid);*/
-	/*char* res;*/
-	/*unsigned char* bid = (unsigned char*)(&id);*/
-	/*unsigned char ubid[4];*/
-	/*int bpsd_len;*/
-	/*unsigned char* bpsd = strtohex(passwordhex , &bpsd_len);*/
-	/*memcpy(ubid , bid , 4);*/
-	/*res = hash_password_v1(ubid , sizeof(id) , bpsd , bpsd_len);*/
-	/*free(bpsd);*/
-	/*return res;*/
-/*}*/
+/* Plato Wu,2010/09/29: Enable it for SIP-C/4.0 will use userid */
+char* hash_password_v2(const char* userid , const char* passwordhex)
+{
+	int id = atoi(userid);
+	char* res;
+	unsigned char* bid = (unsigned char*)(&id);
+	unsigned char ubid[4];
+	int bpsd_len;
+	unsigned char* bpsd = strtohex(passwordhex , &bpsd_len);
+	memcpy(ubid , bid , 4);
+	res = hash_password_v1(ubid , sizeof(id) , bpsd , bpsd_len);
+	free(bpsd);
+	return res;
+}
+
 char* hash_password_v4(const char* userid , const char* password)
 {
 	const char* domain = "fetion.com.cn:";
-	char *res; // , *dst;
+	char *res, *dst;
 	unsigned char* udomain = (unsigned char*)malloc(strlen(domain));
 	unsigned char* upassword = (unsigned char*)malloc(strlen(password));
 	memset(udomain , 0 , strlen(domain));
@@ -691,13 +716,12 @@ char* hash_password_v4(const char* userid , const char* password)
 	res = hash_password_v1(udomain , strlen(domain) , upassword , strlen(password));
 	free(udomain);
 	free(upassword);
-
+//		return res;
+	if(userid == NULL || strlen(userid) == 0)
+	{
 		return res;
-	/*if(userid == NULL || strlen(userid) == 0)*/
-	/*{*/
-		/*return res;*/
-	/*}*/
-	/*dst = hash_password_v2(userid , res);*/
-	/*free(res);*/
-	/*return dst;*/
+	}
+        dst = hash_password_v2(userid,res);
+	free(res);
+	return dst;
 }

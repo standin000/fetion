@@ -243,6 +243,8 @@ gboolean GetContactList(struct fetion_account_data * sip)
 		sip->GetContactTimeOut = NULL;
 		return TRUE;
 	}
+        /* Plato Wu,2010/09/25: this method is deprecate in SIP-C/4.0*/
+#if 0
 	hdr = g_strdup("N: GetContactList\r\n");
 	body =
 	    g_strdup
@@ -252,7 +254,28 @@ gboolean GetContactList(struct fetion_account_data * sip)
 
 	g_free(body);
 	g_free(hdr);
+#else
+        /* Plato Wu,2010/09/29: TODO PGGetGroupList doesn't work for getting group.*/
+        /* hdr = g_strdup("N: PGGetGroupList\r\n"); */
+	/* body = */
+	/*     g_strdup */
+        /*         ("<args><group-list version=\"4\" attributes=\"name;identity\" /></args>"); */
+        
+	/* send_sip_request(sip->gc, "S", "", "", hdr, body, NULL, */
+	/* 		 NULL); */
+	/* g_free(hdr); */
 
+        hdr = g_strdup("N: PresenceV4\r\n");
+	body =
+	    g_strdup
+                ("<args><subscription self=\"v4default;mail-count\" buddy=\"v4default\" version=\"320595567\" /></args>");
+        
+	send_sip_request(sip->gc, "SUB", "", "", hdr, body, NULL,
+			 NULL);
+
+	g_free(body);
+	g_free(hdr);
+#endif
 	return TRUE;
 }
 
@@ -428,7 +451,7 @@ void GetBuddyInfo(struct fetion_account_data *sip, const char *who)
 
 	body = g_strdup_printf("%s",xmlnode_to_str(root, &xml_len));
 	purple_debug_info("fetion:", "GetBuddyInfo:body=[%s]", body);
-
+        /* Plato Wu,2010/09/29: TODO it is deprecate in SIP-C/4.0 */
 	send_sip_request(sip->gc, "S", "", "", "N: GetContactsInfo\r\n", body,
 			 NULL, (TransCallback) GetBuddyInfo_cb);
 

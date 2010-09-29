@@ -72,7 +72,8 @@ struct sipmsg *sipmsg_parse_header(const gchar * header)
 		g_free(msg);
 		return NULL;
 	}
-	if (strstr(parts[0], "SIP-C/2.0")) {	/* numeric response */
+        /* Plato Wu,2010/09/26: Update for SIP-C/4.0 */
+	if (strstr(parts[0], "SIP-C/4.0")) {	/* numeric response */
 		//fix me
 		msg->method = g_strdup(parts[2]);
 		msg->response = strtol(parts[1], NULL, 10);
@@ -154,10 +155,12 @@ char *sipmsg_to_string(const struct sipmsg *msg)
 	struct siphdrelement *elem;
 
 	if (msg->response)
-		g_string_append_printf(outstr, "SIP-C/2.0 %d Unknown\r\n",
+                /* Plato Wu,2010/09/29: Update for SIP-C/4.0 */
+		g_string_append_printf(outstr, "SIP-C/4.0 %d Unknown\r\n",
 				       msg->response);
 	else
-		g_string_append_printf(outstr, "%s %s SIP-C/2.0\r\n",
+                /* Plato Wu,2010/09/29: Update for SIP-C/4.0 */
+		g_string_append_printf(outstr, "%s %s SIP-C/4.0\r\n",
 				       msg->method, msg->target);
 
 	cur = msg->headers;

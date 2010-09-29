@@ -26,4 +26,11 @@ gchar *parse_attribute(const gchar * attrname, const gchar * source);
 void fill_auth(struct fetion_account_data *sip, const gchar * hdr,
 	       struct sip_auth *auth);
 gchar *parse_from(const gchar * hdr);
+
+char* generate_aes_key();
+char* generate_response(const char* nouce , const char* userid, 
+                        const char* password , const char* publickey , const char* key);
+unsigned char* strtohex(const char* in , int* len);
+char* hextostr(const unsigned char* in , int len);
+
 #endif

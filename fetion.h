@@ -128,6 +128,9 @@ struct fetion_account_data {
 	gchar *mobileno;
 	gchar *password;
 	gchar *uri;
+        /* Plato Wu,2010/09/27: SIP/C-4.0 use it through all protocol, like password encryption and 
+           presence message */
+        gchar *uid;
 	gchar *impresa;
 	gchar *ssic;
 	gchar *SsicServer;
@@ -167,6 +170,9 @@ struct fetion_account_data {
 	GHashTable *group2id;
 	GHashTable *tempgroup;
 	GHashTable *portrait_con;
+        /* Plato Wu,2010/09/27: SIP-C/4.0 use uid as index, but fetion plugin use uri, so need
+         * this table*/
+        GHashTable *uri2uid;
 	GList *tempgroup_id;
 	guint registertimeout;
 	guint resendtimeout;

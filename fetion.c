@@ -405,8 +405,8 @@ send_sip_response(PurpleConnection * gc, struct sipmsg *msg, int code,
 		sprintf(len, "%d", (int)strlen(body));
 		sipmsg_add_header(msg, "L", len);
 	}
-
-	g_string_append_printf(outstr, "SIP-C/2.0 %d %s\r\n", code, text);
+        /* Plato Wu,2010/09/29: Update for SIP-C/4.0 */
+	g_string_append_printf(outstr, "SIP-C/4.0 %d %s\r\n", code, text);
 	while (tmp) {
 		name = ((struct siphdrelement *)(tmp->data))->name;
 		value = ((struct siphdrelement *)(tmp->data))->value;
@@ -515,8 +515,8 @@ send_sip_request(PurpleConnection * gc, const gchar * method,
 
 	if (addheaders)
 		addh = addheaders;
-
-	g_string_append_printf(outstr, "%s fetion.com.cn SIP-C/2.0\r\n"
+        /* Plato Wu,2010/09/24: new register command require SIP-C/4.0*/
+	g_string_append_printf(outstr, "%s fetion.com.cn SIP-C/4.0\r\n"
 			       "F: %s\r\n"
 			       "I: %s\r\n"
 			       "Q: %d %s\r\n"
@@ -651,15 +651,17 @@ process_register_response(struct fetion_account_data * sip,
 	switch (msg->response) {
 	case 200:
 		if (sip->registerstatus < FETION_REGISTER_COMPLETE) {
+                        /* Plato Wu,2010/09/24: SIP/C-4.0 dont's need it */
 			/* get buddies from blist */
-			GetPersonalInfo(sip);
+//			GetPersonalInfo(sip);
 			if (sip->GetContactTimeOut)
 				purple_timeout_remove(sip->GetContactTimeOut);
 			sip->GetContactTimeOut =
 			    purple_timeout_add(5000,
 					       (GSourceFunc) GetContactList,
 					       sip);
-			GetContactList(sip);
+                        /* Plato Wu,2010/09/24: SIP/C-4.0 dont's need it */
+//			GetContactList(sip);
 			purple_signal_disconnect(purple_conversations_get_handle(),
 					                        "conversation-created", sip,
 								                      PURPLE_CALLBACK(conversation_created_cb)); 
@@ -1676,8 +1678,8 @@ static PurplePluginInfo info = {
 	"prpl-fetion",					  /**< id             */
 	"fetion",					  /**< name           */
 	DISPLAY_VERSION,				  /**< version        */
-	N_("SIP-C 2.0 Protocol Plugin"),		 /**  summary        */
-	N_("The SIP-C 2.0 Protocol Plugin"),		 /**  description    */
+	N_("SIP-C 4.0 Protocol Plugin"),		 /**  summary        */
+	N_("The SIP-C 4.0 Protocol Plugin"),		 /**  description    */
 	"gradetwo <gradetwo@gmail.com>",		/**< author         */
 	"http://www.linuxsir.org",				       /**< homepage       */
 

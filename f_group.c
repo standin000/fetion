@@ -119,9 +119,9 @@ fetion_change_group(PurpleConnection * gc, const char *who,
 	xmlnode_set_attrib(item, "buddy-lists", g_id);
 
 	body = g_strdup_printf("%s",xmlnode_to_str(root, &xml_len));
-
-	send_sip_request(sip->gc, "S", "", "", "N: SetBuddyLists\r\n", body,
-			 NULL, NULL);
+        /* Plato Wu,2010/09/25: This command is deprecate in SIP-C/4.0 */
+	/* send_sip_request(sip->gc, "S", "", "", "N: SetBuddyLists\r\n", body, */
+	/* 		 NULL, NULL); */
 
 	g_free(body);
 	xmlnode_free(root);

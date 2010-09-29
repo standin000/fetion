@@ -23,6 +23,8 @@
 
 #include "sipmsg.h"
 #include "f_util.h"
+#include <openssl/rsa.h>
+#include <openssl/sha.h>
 
 extern gint g_callid;
 
@@ -203,6 +205,7 @@ fill_auth(struct fetion_account_data *sip, const gchar * hdr,
 	  struct sip_auth *auth)
 {
 	gchar *tmp;
+        char *key, *aeskey;
 
 	if (!hdr) {
 		purple_debug_error("fetion", "fill_auth: hdr==NULL\n");
@@ -214,17 +217,31 @@ fill_auth(struct fetion_account_data *sip, const gchar * hdr,
 	auth->domain = g_strdup("fetion.com.cn");
 	if ((tmp = parse_attribute("nonce=\"", hdr)))
 		auth->nonce = g_ascii_strup(tmp, 32);
-	purple_debug(PURPLE_DEBUG_MISC, "fetion", "nonce: %s domain: %s\n",
-		     auth->nonce ? auth->nonce : "(null)",
-		     auth->domain ? auth->domain : "(null)");
-	if (auth->domain)
-		auth->digest_session_key =
-		    fetion_cipher_digest_calculate_response(sip->username,
-							    auth->domain,
-							    sip->password,
-							    auth->nonce,
-							    auth->cnonce);
 
+        key = g_strndup(strstr(hdr,"key=\"")+5, 262);
+        
+        /* if ((tmp = parse_attribute("key=\"", hdr))) */
+	/* 	key = g_ascii_strup(tmp, 262); */
+
+	purple_debug(PURPLE_DEBUG_MISC, "fetion", "nonce: %s domain: %s\nkey: %s!\nuserid:%s",
+		     auth->nonce ? auth->nonce : "(null)",
+		     auth->domain ? auth->domain : "(null)",
+                     key, sip->password);
+
+        aeskey = generate_aes_key();
+
+	if (auth->domain)
+                /* Plato Wu,2010/09/29: SIP/C-4.0 use RSA algorithm to calculate response */
+		/* auth->digest_session_key = */
+		/*     fetion_cipher_digest_calculate_response(sip->username, */
+		/* 					    auth->domain, */
+		/* 					    sip->password, */
+		/* 					    auth->nonce, */
+		/* 					    auth->cnonce); */
+		auth->digest_session_key =
+                        generate_response(auth->nonce, sip->uid, sip->password, key, aeskey);
+        free(key);
+        free(aeskey);
 }
 
 gchar *parse_from(const gchar * hdr)
@@ -258,4 +275,136 @@ gchar *parse_from(const gchar * hdr)
 	}
 	purple_debug_info("fetion", "got %s\n", from);
 	return from;
+}
+extern char* hash_password_v4(const char* userid , const char* password);
+unsigned char* strtohex(const char* in , int* len) 
+{
+	unsigned char* out = (unsigned char*)malloc(strlen(in)/2 );
+	int i = 0 , j = 0 , k = 0 ,length = 0;
+	char tmp[3] = { 0 };
+	memset(out , 0 , strlen(in) / 2);
+	while(i < (int)strlen(in))
+	{
+		tmp[k++] = in[i++];
+		tmp[k] = '\0';
+		if(k == 2)
+		{
+			out[j++] = (unsigned char)strtol(tmp , (char**)NULL , 16);
+			k = 0;
+			length ++;
+		}
+	}
+	if(len != NULL )
+		*len = length;
+	return out;
+}
+
+char* hextostr(const unsigned char* in , int len) 
+{
+	char* res = (char*)malloc(len * 2 + 1);
+	int i = 0;
+	memset(res , 0 , len * 2 + 1);
+	while(i < len)
+	{
+		sprintf(res + i * 2 , "%02x" , in[i]);
+		i ++;
+	};
+	i = 0;
+	while(i < (int)strlen(res))
+	{
+		res[i] = toupper(res[i]);
+		i ++;
+	};
+        /* Plato Wu,2010/09/24: why dont's free it. */
+        free(in);
+        
+	return res;
+}
+
+char* generate_aes_key()
+{
+	char* key = (char*)malloc(65);
+	memset( key , 0 , 65 );
+	sprintf( key , "%04x%04x%04x%04x%04x%04x%04x"
+			"%04x%04x%04x%04x%04x%04x%04x%04x%04x" , 
+			rand() & 0xFFFF , rand() & 0xFFFF , 
+			rand() & 0xFFFF , rand() & 0xFFFF , 
+			rand() & 0xFFFF , rand() & 0xFFFF , 
+			rand() & 0xFFFF , rand() & 0xFFFF , 
+			rand() & 0xFFFF , rand() & 0xFFFF , 
+			rand() & 0xFFFF , rand() & 0xFFFF ,
+			rand() & 0xFFFF , rand() & 0xFFFF,
+			rand() & 0xFFFF , rand() & 0xFFFF );
+	return key;
+}
+/* Plato Wu,2010/09/29: Copy from Openfetion for SIP-C/4.0 */
+char* generate_response(const char* nouce , const char* userid 
+		, const char* password , const char* publickey , const char* key)
+{
+
+	char* psdhex = hash_password_v4(userid , password);
+	char modulus[257];
+	char exponent[7];
+	int ret, flen;
+	BIGNUM *bnn, *bne;
+	unsigned char *out;
+	unsigned char *nonce , *aeskey , *psd , *res;
+	int nonce_len , aeskey_len , psd_len;
+	RSA *r = RSA_new();
+
+	key = NULL;
+
+	memset(modulus, 0, sizeof(modulus));
+	memset(exponent, 0, sizeof(exponent));
+
+	memcpy(modulus , publickey , 256);
+	memcpy(exponent , publickey + 256 , 6);
+	nonce = (unsigned char*)malloc(strlen(nouce) + 1);
+	memset(nonce , 0 , strlen(nouce) + 1);
+	memcpy(nonce , (unsigned char*)nouce , strlen(nouce));
+	nonce_len = strlen(nouce);
+	psd = strtohex(psdhex , &psd_len);
+        free(psdhex);
+        psdhex = generate_aes_key();
+        
+	//aeskey = strtohex(generate_aes_key() , &aeskey_len);
+              aeskey = strtohex(psdhex, &aeskey_len);
+//        aeskey = strtohex(psdhex, &aeskey_len);
+
+//        psdhex = g_strdup("d4a1c83edde91a70f0878ddcbd3df5218641f8741d82c40e861124549eb4769b");
+                           
+//        aeskey = strtohex(psdhex, &aeskey_len);
+        
+    printf("nonce is %s, userid is %s, password is %s, publickey is %s, key is %s, aeskey is %s!!!",
+           nonce, userid, password, publickey, key, psdhex);
+    free(psdhex);
+    
+
+	res = (unsigned char*)malloc(nonce_len + aeskey_len + psd_len + 1);
+	memset(res , 0 , nonce_len + aeskey_len + psd_len + 1);
+	memcpy(res , nonce , nonce_len);
+	memcpy(res + nonce_len , psd , psd_len );
+	memcpy(res + nonce_len + psd_len , aeskey , aeskey_len);
+
+	bnn = BN_new();
+	bne = BN_new();
+	BN_hex2bn(&bnn, modulus);
+	BN_hex2bn(&bne, exponent);
+	r->n = bnn;	r->e = bne;	r->d = NULL;
+	RSA_print_fp(stdout, r, 5);
+	flen = RSA_size(r);
+	out =  (unsigned char*)malloc(flen);
+	memset(out , 0 , flen);
+	ret = RSA_public_encrypt(nonce_len + aeskey_len + psd_len, res , out, r, RSA_PKCS1_PADDING);
+
+	if (ret < 0)
+	{
+		return NULL;
+	}
+	RSA_free(r);
+	free(res); 
+	free(aeskey);
+	free(psd);
+	free(nonce);
+	return hextostr(out , ret);
 }

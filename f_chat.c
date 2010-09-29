@@ -107,9 +107,100 @@ void SendInvite(struct fetion_account_data *sip, const gchar * who)
 	g_free(body);
 }
 
+void fetion_sip_get_auth_attr(const char* auth , char** ipaddress , int* port , char** credential)
+{
+	char* pos = strstr(auth , "address=\"") + 9;
+	int n = strlen(pos) - strlen(strstr(pos , ":"));
+	char port_str[6] = { 0 };
+	*credential = (char*)malloc(48);
+	memset(*credential , 0 , 48);
+	*ipaddress = (char*)malloc(18);
+	memset(*ipaddress , 0 , 18);
+	strncpy(*ipaddress , pos , n);
+	pos = strstr(pos , ":") + 1;
+	n = strlen(pos) - strlen(strstr(pos , ";"));
+	strncpy(port_str , pos , n);
+	*port = atoi(port_str);
+	pos = strstr(pos , "credential=\"") + 12;
+	strncpy(*credential , pos , strlen(pos) - 1);
+}
+
 void
 process_incoming_invite(struct fetion_account_data *sip, struct sipmsg *msg)
 {
+        /* Plato Wu,2010/09/29: update it for SIP/C 4.0 protocol*/
+#if 1
+        gchar *body, *hdr;
+        const char *auth, *to, *callid;
+        char* ipaddress = NULL;
+	char* credential = NULL;
+        int port;
+	struct group_chat *g_chat;
+	struct fetion_buddy *buddy = NULL;
+
+        auth = g_strdup_printf(sipmsg_find_header(msg, "A"));
+	callid = sipmsg_find_header(msg, "I");
+	to = sipmsg_find_header(msg, "F");
+
+        sipmsg_remove_header(msg, "K");
+        sipmsg_remove_header(msg, "XI");
+        sipmsg_remove_header(msg, "AL");
+        sipmsg_remove_header(msg, "A");
+        purple_debug_info("plato:", "Received a conversation invitation");
+        send_sip_response(sip->gc, msg, 200, "OK", NULL);
+
+        fetion_sip_get_auth_attr(auth , &ipaddress , &port , &credential);
+        purple_debug_info("plato:", "ipaddress is %s, port is %d, credential is %s", ipaddress, port, credential);
+        /* Plato Wu,2010/09/29: TODO Openfetion new a TCP connection here, but I don't
+         * know how to do in pidgin.*/
+        /* purple_proxy_connect(sip->gc, sip->account, ipaddress, port, invite_cb, sip->gc); */
+        /* Plato Wu,2010/09/29: TODO, R command should be sent into new connection. */
+       /* hdr = g_strdup_printf("A: TICKS auth=\"%s\"\r\nK: text/html-fragment\r\n" */
+       /*                       "K: multiparty\r\nK: nudge\r\n", credential); */
+
+       /* send_sip_request(sip->gc, "R", "", "", hdr, body, NULL, NULL); */
+
+       /* purple_debug_info("plato:", "start free"); */
+       
+	if (strncmp(to, "sip:TG", 6) != 0) {
+		buddy = g_hash_table_lookup(sip->buddies, to);
+		if (buddy == NULL) {
+			buddy = g_new0(struct fetion_buddy, 1);
+			buddy->name = g_strdup(to);
+			g_hash_table_insert(sip->buddies, buddy->name, buddy);
+		}
+		if (buddy->dialog == NULL)
+			buddy->dialog = g_new0(struct sip_dialog, 1);
+		else
+			g_free(buddy->dialog->callid);
+		buddy->dialog->callid = g_strdup(callid);
+	} else {
+		g_chat = g_new0(struct group_chat, 1);
+		g_chat->chatid = sip->tg++;
+		g_chat->callid = g_strdup(callid);
+		g_chat->groupname = g_strdup(to);
+		g_hash_table_insert(sip->tempgroup, g_chat->groupname, g_chat);
+		sip->tempgroup_id = g_list_append(sip->tempgroup_id, g_chat);
+
+		g_chat->conv =
+		    serv_got_joined_chat(sip->gc, g_chat->chatid,
+					 "Fetion Chat");
+		purple_conv_chat_add_user(PURPLE_CONV_CHAT(g_chat->conv),
+					  purple_account_get_alias
+					  (sip->account), NULL,
+					  PURPLE_CBFLAGS_NONE, TRUE);
+	}
+
+
+       free(ipaddress); free(credential); g_free(auth);
+       g_free(hdr);
+
+
+
+
+
+
+#else
 	const gchar *to, *callid;
 	gchar *body;
 	const gchar *my_ip;
@@ -162,6 +253,7 @@ process_incoming_invite(struct fetion_account_data *sip, struct sipmsg *msg)
 					  PURPLE_CBFLAGS_NONE, TRUE);
 	}
 	g_free(body);
+#endif
 }
 
 void
