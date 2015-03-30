@@ -155,12 +155,12 @@ process_incoming_invite(struct fetion_account_data *sip, struct sipmsg *msg)
          * know how to do in pidgin.*/
         /* purple_proxy_connect(sip->gc, sip->account, ipaddress, port, invite_cb, sip->gc); */
         /* Plato Wu,2010/09/29: TODO, R command should be sent into new connection. */
-       /* hdr = g_strdup_printf("A: TICKS auth=\"%s\"\r\nK: text/html-fragment\r\n" */
-       /*                       "K: multiparty\r\nK: nudge\r\n", credential); */
+       hdr = g_strdup_printf("A: TICKS auth=\"%s\"\r\n", credential);
+//"       K: text/html-fragment\r\nK: multiparty\r\nK: nudge\r\n"
 
-       /* send_sip_request(sip->gc, "R", "", "", hdr, body, NULL, NULL); */
+       send_sip_request(sip->gc, "R", "", "", hdr, NULL, NULL, NULL);
 
-       /* purple_debug_info("plato:", "start free"); */
+       purple_debug_info("plato:", "start free");
        
 	if (strncmp(to, "sip:TG", 6) != 0) {
 		buddy = g_hash_table_lookup(sip->buddies, to);

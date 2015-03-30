@@ -32,7 +32,8 @@ INCLUDE_PATHS +=	-I. \
 			-I$(PIDGIN_TREE_TOP)
 
 LIB_PATHS +=		-L$(GTK_TOP)/lib \
-			-L$(PURPLE_TOP)
+			-L$(PURPLE_TOP) \
+                        -L/usr/i486-mingw32/lib/
 
 ##
 ##  SOURCES, OBJECTS
@@ -60,7 +61,7 @@ LIBS =	\
 			-lws2_32 \
 			-lintl \
 			-lpurple \
-                        -lssl
+                        -lssl 
 
 include $(PIDGIN_COMMON_RULES)
 
